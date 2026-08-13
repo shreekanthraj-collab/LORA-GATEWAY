@@ -1,10 +1,9 @@
 #include "gw_node_manager.h"
+#include "gw_config.h"
 
 #include <string.h>
 
-#define GW_NODE_MANAGER_MAX_NODES 256u
-
-static GwNodeInfo_t s_nodes[GW_NODE_MANAGER_MAX_NODES];
+static GwNodeInfo_t s_nodes[GW_CONFIG_MAX_NODES];
 static bool s_initialized = false;
 static size_t s_count = 0u;
 
