@@ -32,6 +32,22 @@ typedef struct
     bool registered;
 } GwNodeInfo_t;
 
+/**
+ * Latest telemetry received from a Node.
+ *
+ * This is Gateway runtime storage and is not a wire-protocol structure.
+ */
+typedef struct
+{
+    uint8_t  motor_state;
+    uint8_t  fault_flags;
+    uint16_t turns100;
+    uint16_t voltage100;
+    uint16_t current100;
+    int8_t   rssi;
+    bool     valid;
+} GwNodeTelemetry_t;
+
 GwResult_t gwNodeManagerInit(void);
 
 GwResult_t gwNodeManagerDeinit(void);
@@ -50,6 +66,14 @@ GwResult_t gwNodeManagerGet(
 GwResult_t gwNodeManagerSetState(
     uint8_t node_id,
     GwNodeRuntimeState_t state);
+
+GwResult_t gwNodeManagerUpdateTelemetry(
+    uint8_t node_id,
+    const GwNodeTelemetry_t *telemetry);
+
+GwResult_t gwNodeManagerGetTelemetry(
+    uint8_t node_id,
+    GwNodeTelemetry_t *telemetry);
 
 bool gwNodeManagerIsRegistered(
     uint8_t node_id);
