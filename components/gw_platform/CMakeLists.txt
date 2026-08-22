@@ -1,5 +1,11 @@
 idf_component_register(
-    SRCS "src/gw_platform.c"
-    INCLUDE_DIRS "include"
-    REQUIRES gw_core
+    SRCS
+        "src/gw_platform.c"
+        "src/gw_radio.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        gw_core
+        esp_driver_spi
+        esp_driver_gpio
 )
