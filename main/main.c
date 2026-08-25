@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 
 #include "esp_log.h"
 
@@ -6,6 +6,8 @@
 #include "gw_platform.h"
 #include "gw_radio.h"
 #include "gw_radio_hw.h"
+#include "gw_communication.h"
+#include "gw_transport.h"
 
 static const char *TAG = "GW_MAIN";
 
@@ -44,7 +46,8 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Lifecycle init: OK");
 
-    result = gwLifecycleSetStage(GW_LIFECYCLE_DRIVERS_INIT);
+    result = gwLifecycleSetStage(
+        GW_LIFECYCLE_DRIVERS_INIT);
 
     if (result != GW_RESULT_OK)
     {
@@ -76,7 +79,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Radio A: initialized");
     ESP_LOGI(TAG, "Radio B: initialized");
 
-    result = gwLifecycleSetStage(GW_LIFECYCLE_RADIO_INIT);
+    result = gwLifecycleSetStage(
+        GW_LIFECYCLE_RADIO_INIT);
 
     if (result != GW_RESULT_OK)
     {
@@ -85,19 +89,53 @@ void app_main(void)
     }
 
     /* ---------------------------------------------------------
-     * Application ready
+     * Gateway communication initialization
+     *
+     * Radio hardware is already initialized above.
+     * The communication layer therefore owns the transport
+     * abstraction but does not own radio hardware lifetime.
      * --------------------------------------------------------- */
-    result = gwLifecycleSetStage(GW_LIFECYCLE_APPLICATION_READY);
+    GwTransportConfig_t transport_config = {
+        .type = GW_TRANSPORT_RADIO,
+        .radio = GW_TRANSPORT_RADIO_AUTO
+    };
+
+    result = gwCommunicationInit(
+        &transport_config);
 
     if (result != GW_RESULT_OK)
     {
-        ESP_LOGE(TAG, "Application-ready stage failed: %d", result);
+        ESP_LOGE(
+            TAG,
+            "Communication init FAILED: %d",
+            result);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Communication layer: initialized");
+
+    /* ---------------------------------------------------------
+     * Application ready
+     * --------------------------------------------------------- */
+    result = gwLifecycleSetStage(
+        GW_LIFECYCLE_APPLICATION_READY);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Application-ready stage failed: %d",
+            result);
         return;
     }
 
     ESP_LOGI(TAG, "Gateway application ready");
 
-    result = gwLifecycleSetStage(GW_LIFECYCLE_RUN);
+    /* ---------------------------------------------------------
+     * Gateway RUN
+     * --------------------------------------------------------- */
+    result = gwLifecycleSetStage(
+        GW_LIFECYCLE_RUN);
 
     if (result != GW_RESULT_OK)
     {
@@ -106,8 +144,14 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "Gateway RUN");
-    ESP_LOGI(TAG, "LoRa A frequency: %lu Hz",
-             (unsigned long)GW_RADIO0_FREQUENCY_HZ);
-    ESP_LOGI(TAG, "LoRa B frequency: %lu Hz",
-             (unsigned long)GW_RADIO1_FREQUENCY_HZ);
+
+    ESP_LOGI(
+        TAG,
+        "LoRa A frequency: %lu Hz",
+        (unsigned long)GW_RADIO0_FREQUENCY_HZ);
+
+    ESP_LOGI(
+        TAG,
+        "LoRa B frequency: %lu Hz",
+        (unsigned long)GW_RADIO1_FREQUENCY_HZ);
 }
