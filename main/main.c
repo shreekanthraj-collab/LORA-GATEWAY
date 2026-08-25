@@ -7,22 +7,24 @@
 #include "gw_radio.h"
 #include "gw_radio_hw.h"
 #include "gw_communication.h"
+#include "gw_runtime.h"
 #include "gw_transport.h"
 
 static const char *TAG = "GW_MAIN";
 
 void app_main(void)
 {
+    GwResult_t result;
+
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "ORB DRIVE LORA GATEWAY");
     ESP_LOGI(TAG, "ESP32-S3 / Dual SX1262");
     ESP_LOGI(TAG, "========================================");
 
-    GwResult_t result;
+    /* --------------------------------------------------------- */
+    /* Platform initialization                                   */
+    /* --------------------------------------------------------- */
 
-    /* ---------------------------------------------------------
-     * Platform initialization
-     * --------------------------------------------------------- */
     result = gwPlatformInit();
 
     if (result != GW_RESULT_OK)
@@ -33,9 +35,10 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Platform init: OK");
 
-    /* ---------------------------------------------------------
-     * Gateway lifecycle initialization
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------- */
+    /* Gateway lifecycle initialization                          */
+    /* --------------------------------------------------------- */
+
     result = gwLifecycleInit();
 
     if (result != GW_RESULT_OK)
@@ -55,9 +58,10 @@ void app_main(void)
         return;
     }
 
-    /* ---------------------------------------------------------
-     * Dual SX1262 initialization
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------- */
+    /* Dual SX1262 initialization                                */
+    /* --------------------------------------------------------- */
+
     GwRadioConfig_t radio_config = {
         .frequency_hz = GW_RADIO0_FREQUENCY_HZ,
         .bandwidth = 0U,
@@ -88,13 +92,14 @@ void app_main(void)
         return;
     }
 
-    /* ---------------------------------------------------------
-     * Gateway communication initialization
-     *
-     * Radio hardware is already initialized above.
-     * The communication layer therefore owns the transport
-     * abstraction but does not own radio hardware lifetime.
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------- */
+    /* Gateway communication initialization                      */
+    /*                                                         */
+    /* Radio hardware is already initialized above.             */
+    /* Communication owns the transport abstraction, not       */
+    /* radio hardware lifetime.                                */
+    /* --------------------------------------------------------- */
+
     GwTransportConfig_t transport_config = {
         .type = GW_TRANSPORT_RADIO,
         .radio = GW_TRANSPORT_RADIO_AUTO
@@ -114,9 +119,45 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Communication layer: initialized");
 
-    /* ---------------------------------------------------------
-     * Application ready
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------- */
+    /* Gateway runtime initialization                            */
+    /*                                                         */
+    /* Runtime owns:                                           */
+    /* - Node Manager                                           */
+    /* - Command Service                                        */
+    /* - Event Service                                          */
+    /* --------------------------------------------------------- */
+
+    result = gwRuntimeInit();
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Gateway runtime init FAILED: %d",
+            result);
+
+        (void)gwCommunicationDeinit();
+        return;
+    }
+
+    if (!gwRuntimeIsReady())
+    {
+        ESP_LOGE(TAG, "Gateway runtime is not ready");
+        (void)gwRuntimeDeinit();
+        (void)gwCommunicationDeinit();
+        return;
+    }
+
+    ESP_LOGI(TAG, "Gateway runtime: initialized");
+    ESP_LOGI(TAG, "Node Manager: initialized");
+    ESP_LOGI(TAG, "Command Service: initialized");
+    ESP_LOGI(TAG, "Event Service: initialized");
+
+    /* --------------------------------------------------------- */
+    /* Application ready                                        */
+    /* --------------------------------------------------------- */
+
     result = gwLifecycleSetStage(
         GW_LIFECYCLE_APPLICATION_READY);
 
@@ -131,9 +172,10 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Gateway application ready");
 
-    /* ---------------------------------------------------------
-     * Gateway RUN
-     * --------------------------------------------------------- */
+    /* --------------------------------------------------------- */
+    /* Gateway RUN                                               */
+    /* --------------------------------------------------------- */
+
     result = gwLifecycleSetStage(
         GW_LIFECYCLE_RUN);
 

@@ -9,4 +9,5 @@
         gw_core
         gw_platform
         gw_communication
+        gw_runtime
 )
