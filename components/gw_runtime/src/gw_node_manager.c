@@ -5,8 +5,13 @@
 
 static GwNodeInfo_t s_nodes[GW_CONFIG_MAX_NODES];
 static GwNodeTelemetry_t s_telemetry[GW_CONFIG_MAX_NODES];
+
 static bool s_initialized = false;
 static size_t s_count = 0u;
+
+/* -------------------------------------------------------------------------- */
+/* Lifecycle                                                                  */
+/* -------------------------------------------------------------------------- */
 
 GwResult_t gwNodeManagerInit(void)
 {
@@ -17,6 +22,7 @@ GwResult_t gwNodeManagerInit(void)
 
     memset(s_nodes, 0, sizeof(s_nodes));
     memset(s_telemetry, 0, sizeof(s_telemetry));
+
     s_count = 0u;
     s_initialized = true;
 
@@ -32,11 +38,16 @@ GwResult_t gwNodeManagerDeinit(void)
 
     memset(s_nodes, 0, sizeof(s_nodes));
     memset(s_telemetry, 0, sizeof(s_telemetry));
+
     s_count = 0u;
     s_initialized = false;
 
     return GW_RESULT_OK;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Node registration                                                           */
+/* -------------------------------------------------------------------------- */
 
 GwResult_t gwNodeManagerRegister(
     uint8_t node_id,
@@ -46,6 +57,13 @@ GwResult_t gwNodeManagerRegister(
     {
         return GW_RESULT_NOT_INITIALIZED;
     }
+
+    /*
+     * node_id is uint8_t and GW_CONFIG_MAX_NODES is 256.
+     *
+     * Therefore every possible uint8_t node ID (0..255) is a valid
+     * array index for the configured node table.
+     */
 
     if (s_nodes[node_id].registered)
     {
@@ -57,7 +75,10 @@ GwResult_t gwNodeManagerRegister(
     s_nodes[node_id].state = GW_NODE_STATE_REGISTERED;
     s_nodes[node_id].registered = true;
 
-    memset(&s_telemetry[node_id], 0, sizeof(s_telemetry[node_id]));
+    memset(
+        &s_telemetry[node_id],
+        0,
+        sizeof(s_telemetry[node_id]));
 
     s_count++;
 
@@ -77,13 +98,27 @@ GwResult_t gwNodeManagerUnregister(
         return GW_RESULT_ERROR;
     }
 
-    memset(&s_nodes[node_id], 0, sizeof(s_nodes[node_id]));
-    memset(&s_telemetry[node_id], 0, sizeof(s_telemetry[node_id]));
+    memset(
+        &s_nodes[node_id],
+        0,
+        sizeof(s_nodes[node_id]));
 
-    s_count--;
+    memset(
+        &s_telemetry[node_id],
+        0,
+        sizeof(s_telemetry[node_id]));
+
+    if (s_count > 0u)
+    {
+        s_count--;
+    }
 
     return GW_RESULT_OK;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Node information                                                           */
+/* -------------------------------------------------------------------------- */
 
 GwResult_t gwNodeManagerGet(
     uint8_t node_id,
@@ -134,6 +169,10 @@ GwResult_t gwNodeManagerSetState(
     return GW_RESULT_OK;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Telemetry                                                                  */
+/* -------------------------------------------------------------------------- */
+
 GwResult_t gwNodeManagerUpdateTelemetry(
     uint8_t node_id,
     const GwNodeTelemetry_t *telemetry)
@@ -182,6 +221,10 @@ GwResult_t gwNodeManagerGetTelemetry(
 
     return GW_RESULT_OK;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Queries                                                                    */
+/* -------------------------------------------------------------------------- */
 
 bool gwNodeManagerIsRegistered(
     uint8_t node_id)
