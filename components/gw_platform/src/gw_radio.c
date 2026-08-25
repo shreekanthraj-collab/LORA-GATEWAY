@@ -1,4 +1,4 @@
-#include "gw_radio.h"
+﻿#include "gw_radio.h"
 #include "gw_radio_hw.h"
 
 #include "driver/gpio.h"
@@ -10,12 +10,16 @@
 
 #include <string.h>
 
-#define SX1262_CMD_GET_STATUS          (0xC0U)
+#define SX1262_CMD_GET_STATUS     (0xC0U)
 
-#define SX1262_RESET_LOW_MS            (2U)
-#define SX1262_RESET_HIGH_WAIT_MS      (10U)
+#define SX1262_RESET_LOW_MS       (2U)
+#define SX1262_RESET_HIGH_WAIT_MS (10U)
 
-static bool s_radio_initialized[GW_RADIO_COUNT] = { false };
+static bool s_radio_initialized[GW_RADIO_COUNT] = {
+    false,
+    false
+};
+
 static GwRadioConfig_t s_radio_config;
 
 static spi_device_handle_t s_radio_handle[GW_RADIO_COUNT] = {
@@ -25,10 +29,19 @@ static spi_device_handle_t s_radio_handle[GW_RADIO_COUNT] = {
 
 static bool s_spi_bus_initialized = false;
 
-static bool gwRadioIdValid(GwRadioId_t radio)
+/* -------------------------------------------------------------------------- */
+/* Internal helpers                                                           */
+/* -------------------------------------------------------------------------- */
+
+static bool gwRadioIdValid(
+    GwRadioId_t radio)
 {
-    return (radio < GW_RADIO_COUNT);
+    return radio < GW_RADIO_COUNT;
 }
+
+/* -------------------------------------------------------------------------- */
+/* GPIO                                                                        */
+/* -------------------------------------------------------------------------- */
 
 static esp_err_t gwRadioConfigureGpios(void)
 {
@@ -40,6 +53,7 @@ static esp_err_t gwRadioConfigureGpios(void)
             (1ULL << GW_RADIO1_RESET_GPIO) |
             (1ULL << GW_RADIO1_RXEN_GPIO) |
             (1ULL << GW_RADIO1_TXEN_GPIO),
+
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -47,6 +61,7 @@ static esp_err_t gwRadioConfigureGpios(void)
     };
 
     esp_err_t err = gpio_config(&output_config);
+
     if (err != ESP_OK)
     {
         return err;
@@ -58,6 +73,7 @@ static esp_err_t gwRadioConfigureGpios(void)
             (1ULL << GW_RADIO0_DIO1_GPIO) |
             (1ULL << GW_RADIO1_BUSY_GPIO) |
             (1ULL << GW_RADIO1_DIO1_GPIO),
+
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -65,6 +81,7 @@ static esp_err_t gwRadioConfigureGpios(void)
     };
 
     err = gpio_config(&input_config);
+
     if (err != ESP_OK)
     {
         return err;
@@ -88,18 +105,25 @@ static esp_err_t gwRadioConfigureGpios(void)
     return ESP_OK;
 }
 
+/* -------------------------------------------------------------------------- */
+/* SPI                                                                         */
+/* -------------------------------------------------------------------------- */
+
 static esp_err_t gwRadioConfigureSpi(void)
 {
-    spi_bus_config_t bus_config = {
+    const spi_bus_config_t bus_config = {
         .mosi_io_num = GW_RADIO_SPI_MOSI_GPIO,
         .miso_io_num = GW_RADIO_SPI_MISO_GPIO,
         .sclk_io_num = GW_RADIO_SPI_SCK_GPIO,
+
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+
         .data4_io_num = -1,
         .data5_io_num = -1,
         .data6_io_num = -1,
         .data7_io_num = -1,
+
         .max_transfer_sz = 256
     };
 
@@ -156,13 +180,17 @@ static void gwRadioCleanupSpi(void)
 {
     if (s_radio_handle[GW_RADIO_1] != NULL)
     {
-        spi_bus_remove_device(s_radio_handle[GW_RADIO_1]);
+        spi_bus_remove_device(
+            s_radio_handle[GW_RADIO_1]);
+
         s_radio_handle[GW_RADIO_1] = NULL;
     }
 
     if (s_radio_handle[GW_RADIO_0] != NULL)
     {
-        spi_bus_remove_device(s_radio_handle[GW_RADIO_0]);
+        spi_bus_remove_device(
+            s_radio_handle[GW_RADIO_0]);
+
         s_radio_handle[GW_RADIO_0] = NULL;
     }
 
@@ -173,7 +201,12 @@ static void gwRadioCleanupSpi(void)
     }
 }
 
-static esp_err_t gwRadioHardwareReset(GwRadioId_t radio)
+/* -------------------------------------------------------------------------- */
+/* SX1262 reset                                                                */
+/* -------------------------------------------------------------------------- */
+
+static esp_err_t gwRadioHardwareReset(
+    GwRadioId_t radio)
 {
     gpio_num_t reset_gpio;
 
@@ -192,14 +225,20 @@ static esp_err_t gwRadioHardwareReset(GwRadioId_t radio)
 
     gpio_set_level(reset_gpio, 0);
 
-    vTaskDelay(pdMS_TO_TICKS(SX1262_RESET_LOW_MS));
+    vTaskDelay(
+        pdMS_TO_TICKS(SX1262_RESET_LOW_MS));
 
     gpio_set_level(reset_gpio, 1);
 
-    vTaskDelay(pdMS_TO_TICKS(SX1262_RESET_HIGH_WAIT_MS));
+    vTaskDelay(
+        pdMS_TO_TICKS(SX1262_RESET_HIGH_WAIT_MS));
 
     return ESP_OK;
 }
+
+/* -------------------------------------------------------------------------- */
+/* SX1262 status                                                               */
+/* -------------------------------------------------------------------------- */
 
 static esp_err_t gwRadioGetStatus(
     GwRadioId_t radio,
@@ -216,7 +255,7 @@ static esp_err_t gwRadioGetStatus(
      * SX1262 GetStatus:
      *
      * Byte 0 = command
-     * Byte 1 = dummy byte used to clock out status
+     * Byte 1 = dummy byte used to clock out status.
      */
     uint8_t tx_data[2] = {
         SX1262_CMD_GET_STATUS,
@@ -224,8 +263,8 @@ static esp_err_t gwRadioGetStatus(
     };
 
     uint8_t rx_data[2] = {
-        0U,
-        0U
+        0x00U,
+        0x00U
     };
 
     spi_transaction_t transaction = {
@@ -248,7 +287,12 @@ static esp_err_t gwRadioGetStatus(
     return ESP_OK;
 }
 
-GwResult_t gwRadioInit(const GwRadioConfig_t *config)
+/* -------------------------------------------------------------------------- */
+/* Public API                                                                  */
+/* -------------------------------------------------------------------------- */
+
+GwResult_t gwRadioInit(
+    const GwRadioConfig_t *config)
 {
     if (config == NULL)
     {
@@ -256,10 +300,18 @@ GwResult_t gwRadioInit(const GwRadioConfig_t *config)
     }
 
     if (config->frequency_hz < 850000000UL ||
-        config->frequency_hz > 930000000UL ||
-        config->spreading_factor < 5U ||
-        config->spreading_factor > 12U ||
-        config->coding_rate < 1U ||
+        config->frequency_hz > 930000000UL)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (config->spreading_factor < 5U ||
+        config->spreading_factor > 12U)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (config->coding_rate < 1U ||
         config->coding_rate > 4U)
     {
         return GW_RESULT_INVALID_ARG;
@@ -285,40 +337,59 @@ GwResult_t gwRadioInit(const GwRadioConfig_t *config)
         return GW_RESULT_ERROR;
     }
 
-    memcpy(&s_radio_config, config, sizeof(s_radio_config));
+    memcpy(
+        &s_radio_config,
+        config,
+        sizeof(s_radio_config));
 
     /*
      * M2:
      *
      * Reset and communicate with both SX1262 devices.
      */
-    for (size_t i = 0U; i < GW_RADIO_COUNT; ++i)
+    for (size_t i = 0U;
+         i < GW_RADIO_COUNT;
+         ++i)
     {
-        GwRadioId_t radio = (GwRadioId_t)i;
+        const GwRadioId_t radio =
+            (GwRadioId_t)i;
 
         err = gwRadioHardwareReset(radio);
 
         if (err != ESP_OK)
         {
             gwRadioCleanupSpi();
+            memset(
+                s_radio_initialized,
+                0,
+                sizeof(s_radio_initialized));
+
             return GW_RESULT_ERROR;
         }
 
         uint8_t status = 0U;
 
-        err = gwRadioGetStatus(radio, &status);
+        err = gwRadioGetStatus(
+            radio,
+            &status);
 
         if (err != ESP_OK)
         {
             gwRadioCleanupSpi();
+            memset(
+                s_radio_initialized,
+                0,
+                sizeof(s_radio_initialized));
+
             return GW_RESULT_ERROR;
         }
 
         /*
-         * Status is intentionally captured here.
+         * M2 currently proves that the SPI transaction
+         * completed successfully.
          *
-         * M2 currently proves SPI transaction completion.
-         * Detailed SX1262 status decoding will be added separately.
+         * Detailed SX1262 status decoding is intentionally
+         * separate from this layer revision.
          */
         (void)status;
 
@@ -332,7 +403,9 @@ GwResult_t gwRadioDeinit(void)
 {
     bool any_initialized = false;
 
-    for (size_t i = 0U; i < GW_RADIO_COUNT; ++i)
+    for (size_t i = 0U;
+         i < GW_RADIO_COUNT;
+         ++i)
     {
         if (s_radio_initialized[i])
         {
@@ -346,12 +419,17 @@ GwResult_t gwRadioDeinit(void)
         return GW_RESULT_NOT_INITIALIZED;
     }
 
-    for (size_t i = 0U; i < GW_RADIO_COUNT; ++i)
+    for (size_t i = 0U;
+         i < GW_RADIO_COUNT;
+         ++i)
     {
         s_radio_initialized[i] = false;
     }
 
-    memset(&s_radio_config, 0, sizeof(s_radio_config));
+    memset(
+        &s_radio_config,
+        0,
+        sizeof(s_radio_config));
 
     gwRadioCleanupSpi();
 
@@ -364,7 +442,8 @@ GwResult_t gwRadioSend(
     size_t length)
 {
     if (!gwRadioIdValid(radio) ||
-        (data == NULL && length != 0U))
+        data == NULL ||
+        length == 0U)
     {
         return GW_RESULT_INVALID_ARG;
     }
@@ -375,7 +454,7 @@ GwResult_t gwRadioSend(
     }
 
     /*
-     * SX1262 transmit protocol will be implemented later.
+     * SX1262 transmit protocol is not implemented yet.
      */
     return GW_RESULT_NOT_READY;
 }
@@ -402,12 +481,13 @@ GwResult_t gwRadioReceive(
     *received_length = 0U;
 
     /*
-     * SX1262 receive protocol will be implemented later.
+     * SX1262 receive protocol is not implemented yet.
      */
     return GW_RESULT_NOT_READY;
 }
 
-bool gwRadioIsInitialized(GwRadioId_t radio)
+bool gwRadioIsInitialized(
+    GwRadioId_t radio)
 {
     return gwRadioIdValid(radio) &&
            s_radio_initialized[radio];
@@ -415,7 +495,9 @@ bool gwRadioIsInitialized(GwRadioId_t radio)
 
 bool gwRadioAllInitialized(void)
 {
-    for (size_t i = 0U; i < GW_RADIO_COUNT; ++i)
+    for (size_t i = 0U;
+         i < GW_RADIO_COUNT;
+         ++i)
     {
         if (!s_radio_initialized[i])
         {
@@ -426,14 +508,18 @@ bool gwRadioAllInitialized(void)
     return true;
 }
 
-GwResult_t gwRadioGetConfig(GwRadioConfig_t *config)
+GwResult_t gwRadioGetConfig(
+    GwRadioConfig_t *config)
 {
     if (config == NULL)
     {
         return GW_RESULT_INVALID_ARG;
     }
 
-    memcpy(config, &s_radio_config, sizeof(s_radio_config));
+    memcpy(
+        config,
+        &s_radio_config,
+        sizeof(s_radio_config));
 
     return GW_RESULT_OK;
 }
