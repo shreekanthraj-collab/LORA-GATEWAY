@@ -4,6 +4,7 @@
 #include "gw_types.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +29,19 @@ GwResult_t gwRuntimeDeinit(void);
 bool gwRuntimeIsInitialized(void);
 
 bool gwRuntimeIsReady(void);
+
+/**
+ * Process one received Gateway packet.
+ *
+ * The packet is received from the communication layer,
+ * classified by wire packet type, and dispatched to the
+ * appropriate Layer-3 event service.
+ *
+ * Transport ownership remains outside the runtime.
+ */
+GwResult_t gwRuntimeProcessRx(
+    const uint8_t *data,
+    size_t length);
 
 #ifdef __cplusplus
 }
