@@ -49,7 +49,6 @@ static GwResult_t gwEventProcessAck(
     size_t length)
 {
     const GwLoRaAck_t *packet;
-
     GwResult_t result;
 
     result = gwEventValidatePacket(
@@ -66,12 +65,12 @@ static GwResult_t gwEventProcessAck(
     packet = (const GwLoRaAck_t *)data;
 
     /*
-     * ACK processing will later be connected to a
-     * command transaction/sequence manager.
+     * ACK processing will later be connected to the
+     * command transaction / sequence manager.
      *
-     * For this Layer-3 revision, validation is sufficient.
+     * For this Layer-3 revision, packet validation is
+     * sufficient.
      */
-
     (void)packet;
 
     return GW_RESULT_OK;
@@ -86,9 +85,7 @@ static GwResult_t gwEventProcessStatus(
     size_t length)
 {
     const GwLoRaStatus_t *packet;
-
     GwNodeTelemetry_t telemetry;
-
     GwResult_t result;
 
     result = gwEventValidatePacket(
@@ -138,6 +135,13 @@ static GwResult_t gwEventProcessStatus(
     /*
      * Valid telemetry means the Node is currently reachable.
      */
+    if (packet->fault_flags != 0u)
+    {
+        return gwNodeManagerSetState(
+            packet->node,
+            GW_NODE_STATE_FAULT);
+    }
+
     return gwNodeManagerSetState(
         packet->node,
         GW_NODE_STATE_ONLINE);
@@ -152,7 +156,7 @@ static GwResult_t gwEventProcessEvent(
     size_t length)
 {
     const GwLoRaEvent_t *packet;
-
+    GwNodeTelemetry_t telemetry;
     GwResult_t result;
 
     result = gwEventValidatePacket(
@@ -174,19 +178,80 @@ static GwResult_t gwEventProcessEvent(
     }
 
     /*
-     * Event-specific runtime handling will be added here.
+     * EVENT packets carry instantaneous voltage/current
+     * information. Preserve that information in the
+     * Gateway runtime telemetry model.
      *
-     * The packet is already:
-     *   - length validated
-     *   - packet type validated
-     *   - CRC validated
-     *
-     * For now, receiving a valid event confirms that
-     * the Node is reachable.
+     * Existing telemetry fields that are not present in
+     * the event packet are intentionally left unchanged.
      */
-    return gwNodeManagerSetState(
-        packet->node,
-        GW_NODE_STATE_ONLINE);
+    if (gwNodeManagerGetTelemetry(
+            packet->node,
+            &telemetry) == GW_RESULT_OK)
+    {
+        telemetry.voltage100 = packet->voltage100;
+        telemetry.current100 = packet->current100;
+        telemetry.valid = true;
+
+        result = gwNodeManagerUpdateTelemetry(
+            packet->node,
+            &telemetry);
+
+        if (result != GW_RESULT_OK)
+        {
+            return result;
+        }
+    }
+
+    /*
+     * Fault event is a runtime fault condition.
+     *
+     * Do not mark a Node ONLINE merely because the packet
+     * itself was successfully received.
+     */
+    if (packet->event == GW_EVT_FAULT ||
+        packet->event == GW_EVT_CALIB_FAIL)
+    {
+        return gwNodeManagerSetState(
+            packet->node,
+            GW_NODE_STATE_FAULT);
+    }
+
+    /*
+     * A valid operational event confirms that the Node is
+     * reachable.
+     *
+     * EOL/manufacturing events are deliberately not given
+     * special production-runtime behavior here.
+     */
+    switch (packet->event)
+    {
+        case GW_EVT_OPEN_DONE:
+        case GW_EVT_CLOSE_DONE:
+        case GW_EVT_LOW_VOLTAGE:
+        case GW_EVT_BOOT:
+        case GW_EVT_WAIT_BYPASS:
+        case GW_EVT_BOUND:
+        case GW_EVT_REBIND:
+        case GW_EVT_CALIB_DONE:
+        case GW_EVT_CALIB_STEP:
+        case GW_EVT_REBIND_COMPLETE:
+            return gwNodeManagerSetState(
+                packet->node,
+                GW_NODE_STATE_ONLINE);
+
+        case GW_EVT_NOT_EOL_TESTED:
+            /*
+             * This is an EOL/manufacturing indication.
+             *
+             * Production runtime must not introduce EOL
+             * behavior or state transitions here.
+             */
+            return GW_RESULT_OK;
+
+        default:
+            return GW_RESULT_INVALID_ARG;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -198,7 +263,6 @@ static GwResult_t gwEventProcessScheduleStatus(
     size_t length)
 {
     const GwLoRaSchedStatus_t *packet;
-
     GwResult_t result;
 
     result = gwEventValidatePacket(
@@ -239,9 +303,12 @@ static GwResult_t gwEventProcessRebind(
     size_t length)
 {
     const GwLoRaRebindEvent_t *packet;
-
     GwResult_t result;
 
+    /*
+     * Rebind is represented on the wire as a normal
+     * GW_PKT_EVENT packet.
+     */
     result = gwEventValidatePacket(
         data,
         length,
@@ -259,8 +326,8 @@ static GwResult_t gwEventProcessRebind(
      * Rebind handling is deliberately kept separate from
      * normal telemetry registration.
      *
-     * The event is validated here. Persistent ownership
-     * changes will require the dedicated rebind service.
+     * Persistent ownership changes require the dedicated
+     * rebind service.
      */
     (void)packet;
 
@@ -318,11 +385,6 @@ GwResult_t gwEventServiceProcess(
         return GW_RESULT_INVALID_ARG;
     }
 
-    if (message->length > GW_COMM_MAX_PACKET_SIZE)
-    {
-        return GW_RESULT_INVALID_ARG;
-    }
-
     switch (message->type)
     {
         case GW_EVENT_TYPE_ACK:
@@ -354,6 +416,10 @@ GwResult_t gwEventServiceProcess(
             return GW_RESULT_INVALID_ARG;
     }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Queries                                                                     */
+/* -------------------------------------------------------------------------- */
 
 bool gwEventServiceIsInitialized(void)
 {
