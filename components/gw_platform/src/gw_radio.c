@@ -486,13 +486,6 @@ GwResult_t gwRadioReceive(
     return GW_RESULT_NOT_READY;
 }
 
-bool gwRadioIsInitialized(
-    GwRadioId_t radio)
-{
-    return gwRadioIdValid(radio) &&
-           s_radio_initialized[radio];
-}
-
 bool gwRadioAllInitialized(void)
 {
     for (size_t i = 0U;
@@ -506,20 +499,4 @@ bool gwRadioAllInitialized(void)
     }
 
     return true;
-}
-
-GwResult_t gwRadioGetConfig(
-    GwRadioConfig_t *config)
-{
-    if (config == NULL)
-    {
-        return GW_RESULT_INVALID_ARG;
-    }
-
-    memcpy(
-        config,
-        &s_radio_config,
-        sizeof(s_radio_config));
-
-    return GW_RESULT_OK;
 }
