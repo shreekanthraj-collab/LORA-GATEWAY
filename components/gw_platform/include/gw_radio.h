@@ -36,10 +36,25 @@ typedef enum
 /* Radio configuration                                                         */
 /* ========================================================================== */
 
+/**
+ * LoRa radio configuration.
+ *
+ * bandwidth is expressed in kHz.
+ *
+ * Supported values used by the current SX1262 implementation include:
+ *
+ *   125 kHz
+ *   250 kHz
+ *   500 kHz
+ *
+ * uint16_t is intentionally used because 500 cannot be represented
+ * by the previous uint8_t field without ambiguity in the validation
+ * logic.
+ */
 typedef struct
 {
     uint32_t frequency_hz;
-    uint8_t bandwidth;
+    uint16_t bandwidth;
     uint8_t spreading_factor;
     uint8_t coding_rate;
     int8_t tx_power_dbm;
