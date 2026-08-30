@@ -436,6 +436,174 @@ GwResult_t gwRadioDeinit(void)
     return GW_RESULT_OK;
 }
 
+bool gwRadioIsInitialized(
+    GwRadioId_t radio)
+{
+    if (!gwRadioIdValid(radio))
+    {
+        return false;
+    }
+
+    return s_radio_initialized[radio];
+}
+
+GwResult_t gwRadioGetConfig(
+    GwRadioConfig_t *config)
+{
+    if (config == NULL)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (!gwRadioAllInitialized())
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    memcpy(
+        config,
+        &s_radio_config,
+        sizeof(*config));
+
+    return GW_RESULT_OK;
+}
+
+GwResult_t gwRadioReset(
+    GwRadioId_t radio)
+{
+    if (!gwRadioIdValid(radio))
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (!s_radio_initialized[radio])
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (gwRadioHardwareReset(radio) != ESP_OK)
+    {
+        return GW_RESULT_ERROR;
+    }
+
+    return GW_RESULT_OK;
+}
+
+GwResult_t gwRadioGetBusy(
+    GwRadioId_t radio,
+    bool *busy)
+{
+    gpio_num_t busy_gpio;
+
+    if (!gwRadioIdValid(radio) ||
+        busy == NULL)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (!s_radio_initialized[radio])
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (radio == GW_RADIO_0)
+    {
+        busy_gpio = GW_RADIO0_BUSY_GPIO;
+    }
+    else
+    {
+        busy_gpio = GW_RADIO1_BUSY_GPIO;
+    }
+
+    *busy = (gpio_get_level(busy_gpio) != 0);
+
+    return GW_RESULT_OK;
+}
+
+GwResult_t gwRadioGetDio1(
+    GwRadioId_t radio,
+    bool *dio1)
+{
+    gpio_num_t dio1_gpio;
+
+    if (!gwRadioIdValid(radio) ||
+        dio1 == NULL)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (!s_radio_initialized[radio])
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (radio == GW_RADIO_0)
+    {
+        dio1_gpio = GW_RADIO0_DIO1_GPIO;
+    }
+    else
+    {
+        dio1_gpio = GW_RADIO1_DIO1_GPIO;
+    }
+
+    *dio1 = (gpio_get_level(dio1_gpio) != 0);
+
+    return GW_RESULT_OK;
+}
+
+GwResult_t gwRadioSetRxTx(
+    GwRadioId_t radio,
+    bool rx_enable,
+    bool tx_enable)
+{
+    gpio_num_t rxen_gpio;
+    gpio_num_t txen_gpio;
+
+    if (!gwRadioIdValid(radio))
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (rx_enable && tx_enable)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    if (!s_radio_initialized[radio])
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (radio == GW_RADIO_0)
+    {
+        rxen_gpio = GW_RADIO0_RXEN_GPIO;
+        txen_gpio = GW_RADIO0_TXEN_GPIO;
+    }
+    else
+    {
+        rxen_gpio = GW_RADIO1_RXEN_GPIO;
+        txen_gpio = GW_RADIO1_TXEN_GPIO;
+    }
+
+    /*
+     * Apply the safe state first so RX/TX
+     * can never intentionally overlap.
+     */
+    gpio_set_level(rxen_gpio, 0);
+    gpio_set_level(txen_gpio, 0);
+
+    if (rx_enable)
+    {
+        gpio_set_level(rxen_gpio, 1);
+    }
+    else if (tx_enable)
+    {
+        gpio_set_level(txen_gpio, 1);
+    }
+
+    return GW_RESULT_OK;
+}
+
 GwResult_t gwRadioSend(
     GwRadioId_t radio,
     const uint8_t *data,

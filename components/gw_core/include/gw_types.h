@@ -23,18 +23,20 @@ typedef enum
 } GwRuntimeState_t;
 
 /**
- * Generic result used by Gateway core modules.
+ * Generic result used by Gateway core and platform modules.
  */
 typedef enum
 {
     GW_RESULT_OK = 0,
-    GW_RESULT_INVALID_ARG,
+
     GW_RESULT_ALREADY_INITIALIZED,
     GW_RESULT_NOT_INITIALIZED,
     GW_RESULT_BUSY,
     GW_RESULT_NOT_READY,
     GW_RESULT_TIMEOUT,
+    GW_RESULT_INVALID_ARG,
     GW_RESULT_ERROR
+
 } GwResult_t;
 
 #ifdef __cplusplus
