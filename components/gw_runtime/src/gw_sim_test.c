@@ -1026,6 +1026,120 @@ static GwResult_t gwSimTestScheduleStatus(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Rebind EVENT validation                                                    */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestRebindEvent(void)
+{
+    GwLoRaRebindEvent_t packet = {0};
+    GwEventMessage_t message;
+    GwResult_t result;
+
+    packet.node = GW_SIM_TEST_NODE_ID;
+    packet.type = GW_PKT_EVENT;
+    packet.seq = 9u;
+    packet.event = GW_EVT_REBIND_COMPLETE;
+    packet.old_gwid = GW_SIM_TEST_GATEWAY_ID;
+    packet.new_gwid = 0x02u;
+    packet.gwid = 0x02u;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    message.type = GW_EVENT_TYPE_REBIND;
+    message.data = (const uint8_t *)&packet;
+    message.length = sizeof(packet);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Valid REBIND EVENT: %d",
+            result);
+
+        return result;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Valid REBIND EVENT");
+
+    message.length = sizeof(packet) - 1u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] REBIND wrong length accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] REBIND wrong length rejected");
+
+    message.length = sizeof(packet);
+    packet.type = GW_PKT_STATUS;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] REBIND wrong type accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] REBIND wrong type rejected");
+
+    packet.type = GW_PKT_EVENT;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    packet.crc8 ^= 0x01u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_ERROR)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] REBIND bad CRC accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] REBIND bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Fault STATUS                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -1243,7 +1357,12 @@ GwResult_t gwSimTestRun(void)
     /* ---------------------------------------------------------------------- */
     /* Fault handling                                                         */
     /* ---------------------------------------------------------------------- */
+result = gwSimTestRebindEvent();
 
+if (result != GW_RESULT_OK)
+{
+    return result;
+}
     result = gwSimTestFaultStatus();
 
     if (result != GW_RESULT_OK)
