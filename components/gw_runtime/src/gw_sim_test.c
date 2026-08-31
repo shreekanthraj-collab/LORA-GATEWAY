@@ -439,7 +439,29 @@ static GwResult_t gwSimTestRuntimeRx(void)
         TAG,
         "[PASS] Runtime RX STATUS classification");
 
-    return GW_RESULT_OK;
+    /* ---------------------------------------------------------------------- */
+    /* Runtime RX invalid length                                              */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwRuntimeProcessRx(
+        (const uint8_t *)&status,
+        1u);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Runtime RX short packet accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Runtime RX short packet rejected");
+     return GW_RESULT_OK;
+
 }
 
 /* -------------------------------------------------------------------------- */
