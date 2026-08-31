@@ -460,6 +460,34 @@ static GwResult_t gwSimTestRuntimeRx(void)
     ESP_LOGI(
         TAG,
         "[PASS] Runtime RX short packet rejected");
+    /* ---------------------------------------------------------------------- */
+    /* Runtime RX unknown packet type                                         */
+    /* ---------------------------------------------------------------------- */
+
+    status.type = 0xFFu;
+
+    status.crc8 = gwPacketCrc8(
+        (const uint8_t *)&status,
+        sizeof(status) - 1u);
+
+    result = gwRuntimeProcessRx(
+        (const uint8_t *)&status,
+        sizeof(status));
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Runtime RX unknown packet type accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Runtime RX unknown packet type rejected");
+
      return GW_RESULT_OK;
 
 }
