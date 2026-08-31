@@ -874,6 +874,158 @@ static GwResult_t gwSimTestUnregisteredNode(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Schedule STATUS validation                                                */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestScheduleStatus(void)
+{
+    GwLoRaSchedStatus_t packet = {0};
+    GwEventMessage_t message;
+    GwNodeInfo_t info;
+    GwResult_t result;
+
+    /* ---------------------------------------------------------------------- */
+    /* Valid schedule status                                                  */
+    /* ---------------------------------------------------------------------- */
+
+    packet.node = GW_SIM_TEST_NODE_ID;
+    packet.type = GW_PKT_SCHED;
+    packet.seq = 8u;
+    packet.slot = 0u;
+    packet.enabled = 1u;
+    packet.action = GW_CMD_OPEN;
+    packet.hour = 6u;
+    packet.minute = 30u;
+    packet.days = 0x7Fu;
+    packet.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    message.type = GW_EVENT_TYPE_SCHEDULE_STATUS;
+    message.data = (const uint8_t *)&packet;
+    message.length = sizeof(packet);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Valid SCHEDULE STATUS: %d",
+            result);
+
+        return result;
+    }
+
+    result = gwNodeManagerGet(
+        GW_SIM_TEST_NODE_ID,
+        &info);
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    if (info.state != GW_NODE_STATE_ONLINE)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] SCHEDULE STATUS did not set node ONLINE");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Valid SCHEDULE STATUS");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong length                                                           */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(packet) - 1u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] SCHEDULE wrong length accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] SCHEDULE wrong length rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong packet type                                                      */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(packet);
+    packet.type = GW_PKT_EVENT;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] SCHEDULE wrong type accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] SCHEDULE wrong type rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Bad CRC                                                                */
+    /* ---------------------------------------------------------------------- */
+
+    packet.type = GW_PKT_SCHED;
+
+    packet.crc8 = gwPacketCrc8(
+        (const uint8_t *)&packet,
+        sizeof(packet) - 1u);
+
+    packet.crc8 ^= 0x01u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_ERROR)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] SCHEDULE bad CRC accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] SCHEDULE bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Fault STATUS                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -1070,7 +1222,18 @@ GwResult_t gwSimTestRun(void)
     /* Unregistered node                                                      */
     /* ---------------------------------------------------------------------- */
 
-    result = gwSimTestUnregisteredNode();
+       result = gwSimTestUnregisteredNode();
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Schedule STATUS                                                        */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwSimTestScheduleStatus();
 
     if (result != GW_RESULT_OK)
     {
