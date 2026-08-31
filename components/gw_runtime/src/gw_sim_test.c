@@ -1336,7 +1336,7 @@ GwResult_t gwSimTestRun(void)
     /* Unregistered node                                                      */
     /* ---------------------------------------------------------------------- */
 
-       result = gwSimTestUnregisteredNode();
+    result = gwSimTestUnregisteredNode();
 
     if (result != GW_RESULT_OK)
     {
