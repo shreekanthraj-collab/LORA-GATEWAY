@@ -6,6 +6,7 @@
 #include "gw_communication.h"
 #include "gw_event_service.h"
 #include "gw_node_manager.h"
+#include "gw_runtime.h"
 #include "gw_protocol.h"
 #include "gw_transport.h"
 
@@ -392,6 +393,51 @@ static GwResult_t gwSimTestAck(void)
     ESP_LOGI(
         TAG,
         "[PASS] ACK bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Runtime RX classification                                                  */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestRuntimeRx(void)
+{
+    GwLoRaStatus_t status = {0};
+    GwResult_t result;
+
+    status.node = GW_SIM_TEST_NODE_ID;
+    status.type = GW_PKT_STATUS;
+    status.seq = 10u;
+    status.motor_state = 1u;
+    status.fault_flags = 0u;
+    status.turns100 = 1250u;
+    status.voltage100 = 2400u;
+    status.current100 = 350u;
+    status.rssi = -55;
+    status.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    status.crc8 = gwPacketCrc8(
+        (const uint8_t *)&status,
+        sizeof(status) - 1u);
+
+    result = gwRuntimeProcessRx(
+        (const uint8_t *)&status,
+        sizeof(status));
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Runtime RX STATUS: %d",
+            result);
+
+        return result;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Runtime RX STATUS classification");
 
     return GW_RESULT_OK;
 }
@@ -1256,6 +1302,16 @@ GwResult_t gwSimTestRun(void)
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestAck();
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+    /* ---------------------------------------------------------------------- */
+    /* Runtime RX classification                                              */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwSimTestRuntimeRx();
 
     if (result != GW_RESULT_OK)
     {
