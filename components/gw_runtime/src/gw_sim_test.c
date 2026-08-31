@@ -71,7 +71,7 @@ static GwResult_t gwSimTestTransportLoopback(void)
     GwResult_t result;
 
     /* ---------------------------------------------------------------------- */
-    /* Initialize SIM transport                                              */
+    /* Initialize SIM transport                                               */
     /* ---------------------------------------------------------------------- */
 
     result = gwTransportInit(&config);
@@ -210,7 +210,7 @@ static GwResult_t gwSimTestTransportLoopback(void)
         "[PASS] SIM loopback packet and CRC");
 
     /* ---------------------------------------------------------------------- */
-    /* Deinitialize SIM transport                                            */
+    /* Deinitialize SIM transport                                             */
     /* ---------------------------------------------------------------------- */
 
     result = gwTransportDeinit();
@@ -721,6 +721,271 @@ static GwResult_t gwSimTestStatusEvent(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Invalid STATUS packet tests                                                */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestInvalidStatus(void)
+{
+    GwLoRaStatus_t status = {0};
+    GwEventMessage_t message;
+    GwResult_t result;
+
+    status.node = GW_SIM_TEST_NODE_ID;
+    status.type = GW_PKT_STATUS;
+    status.seq = 4u;
+    status.motor_state = 1u;
+    status.fault_flags = 0u;
+    status.turns100 = 1250u;
+    status.voltage100 = 2400u;
+    status.current100 = 350u;
+    status.rssi = -55;
+    status.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    status.crc8 = gwPacketCrc8(
+        (const uint8_t *)&status,
+        sizeof(status) - 1u);
+
+    message.type = GW_EVENT_TYPE_STATUS;
+    message.data = (const uint8_t *)&status;
+    message.length = sizeof(status);
+
+    /* ---------------------------------------------------------------------- */
+    /* Baseline: valid STATUS must be accepted                                */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Valid STATUS baseline");
+
+        return result;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Valid STATUS baseline");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong length                                                           */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(status) - 1u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] STATUS wrong length accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] STATUS wrong length rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong packet type                                                       */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(status);
+    status.type = GW_PKT_EVENT;
+
+    status.crc8 = gwPacketCrc8(
+        (const uint8_t *)&status,
+        sizeof(status) - 1u);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] STATUS wrong type accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] STATUS wrong type rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Restore packet type and test bad CRC                                   */
+    /* ---------------------------------------------------------------------- */
+
+    status.type = GW_PKT_STATUS;
+
+    status.crc8 = gwPacketCrc8(
+        (const uint8_t *)&status,
+        sizeof(status) - 1u);
+
+    status.crc8 ^= 0x01u;
+
+    message.length = sizeof(status);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_ERROR)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] STATUS bad CRC accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] STATUS bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Invalid EVENT packet tests                                                 */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestInvalidEvent(void)
+{
+    GwLoRaEvent_t event = {0};
+    GwEventMessage_t message;
+    GwResult_t result;
+
+    event.node = GW_SIM_TEST_NODE_ID;
+    event.type = GW_PKT_EVENT;
+    event.seq = 5u;
+    event.event = GW_EVT_OPEN_DONE;
+    event.voltage100 = 2410u;
+    event.current100 = 360u;
+    event.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    event.crc8 = gwPacketCrc8(
+        (const uint8_t *)&event,
+        sizeof(event) - 1u);
+
+    message.type = GW_EVENT_TYPE_EVENT;
+    message.data = (const uint8_t *)&event;
+    message.length = sizeof(event);
+
+    /* ---------------------------------------------------------------------- */
+    /* Baseline: valid EVENT must be accepted                                 */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Valid EVENT baseline");
+
+        return result;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Valid EVENT baseline");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong length                                                           */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(event) - 1u;
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] EVENT wrong length accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] EVENT wrong length rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Wrong packet type                                                       */
+    /* ---------------------------------------------------------------------- */
+
+    message.length = sizeof(event);
+    event.type = GW_PKT_STATUS;
+
+    event.crc8 = gwPacketCrc8(
+        (const uint8_t *)&event,
+        sizeof(event) - 1u);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_INVALID_ARG)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] EVENT wrong type accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] EVENT wrong type rejected");
+
+    /* ---------------------------------------------------------------------- */
+    /* Restore packet type and test bad CRC                                   */
+    /* ---------------------------------------------------------------------- */
+
+    event.type = GW_PKT_EVENT;
+
+    event.crc8 = gwPacketCrc8(
+        (const uint8_t *)&event,
+        sizeof(event) - 1u);
+
+    event.crc8 ^= 0x01u;
+
+    message.length = sizeof(event);
+
+    result = gwEventServiceProcess(
+        &message);
+
+    if (result != GW_RESULT_ERROR)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] EVENT bad CRC accepted: %d",
+            result);
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] EVENT bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Fault STATUS                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -804,7 +1069,7 @@ static GwResult_t gwSimTestFaultStatus(void)
 }
 
 /* -------------------------------------------------------------------------- */
-/* Full Gateway SIM test                                                     */
+/* Full Gateway SIM test                                                      */
 /* -------------------------------------------------------------------------- */
 
 GwResult_t gwSimTestRun(void)
@@ -824,7 +1089,7 @@ GwResult_t gwSimTestRun(void)
         "========================================");
 
     /* ---------------------------------------------------------------------- */
-    /* Transport                                                               */
+    /* Transport                                                              */
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestTransportLoopback();
@@ -835,7 +1100,7 @@ GwResult_t gwSimTestRun(void)
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Command Service                                                         */
+    /* Command Service                                                        */
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestCommandService();
@@ -846,7 +1111,7 @@ GwResult_t gwSimTestRun(void)
     }
 
     /* ---------------------------------------------------------------------- */
-    /* ACK                                                                      */
+    /* ACK                                                                     */
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestAck();
@@ -872,7 +1137,7 @@ GwResult_t gwSimTestRun(void)
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Register test node                                                      */
+    /* Register test node                                                     */
     /* ---------------------------------------------------------------------- */
 
     result = gwNodeManagerRegister(
@@ -894,7 +1159,7 @@ GwResult_t gwSimTestRun(void)
         "[PASS] SIM test node registration");
 
     /* ---------------------------------------------------------------------- */
-    /* STATUS + EVENT                                                          */
+    /* STATUS + EVENT                                                         */
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestStatusEvent();
@@ -905,7 +1170,29 @@ GwResult_t gwSimTestRun(void)
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Fault handling                                                          */
+    /* Invalid STATUS                                                         */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwSimTestInvalidStatus();
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Invalid EVENT                                                          */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwSimTestInvalidEvent();
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Fault handling                                                         */
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestFaultStatus();
@@ -916,7 +1203,7 @@ GwResult_t gwSimTestRun(void)
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Complete                                                                 */
+    /* Complete                                                               */
     /* ---------------------------------------------------------------------- */
 
     ESP_LOGI(
