@@ -240,9 +240,10 @@ static GwResult_t gwSimTestCommandService(void)
         rx_packet,
         sizeof(packet));
 
-    if (packet.node != GW_SIM_TEST_NODE_ID ||
-        packet.type != GW_PKT_CMD ||
-        packet.cmd != GW_CMD_OPEN)
+if (packet.node != GW_SIM_TEST_NODE_ID ||
+    packet.type != GW_PKT_CMD ||
+    packet.cmd != GW_CMD_OPEN ||
+    packet.seq != 0u)
     {
         ESP_LOGE(
             TAG,
