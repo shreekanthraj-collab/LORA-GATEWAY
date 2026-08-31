@@ -488,9 +488,41 @@ static GwResult_t gwSimTestRuntimeRx(void)
     ESP_LOGI(
         TAG,
         "[PASS] Runtime RX unknown packet type rejected");
+    /* ---------------------------------------------------------------------- */
+    /* Runtime RX ACK classification                                          */
+    /* ---------------------------------------------------------------------- */
 
-     return GW_RESULT_OK;
+    GwLoRaAck_t ack = {0};
 
+    ack.node = GW_SIM_TEST_NODE_ID;
+    ack.type = GW_PKT_ACK;
+    ack.seq = 1u;
+    ack.result = GW_ACK_OK;
+    ack.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    ack.crc8 = gwPacketCrc8(
+        (const uint8_t *)&ack,
+        sizeof(ack) - 1u);
+
+    result = gwRuntimeProcessRx(
+        (const uint8_t *)&ack,
+        sizeof(ack));
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] Runtime RX ACK: %d",
+            result);
+
+        return result;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] Runtime RX ACK classification");
+
+    return GW_RESULT_OK;
 }
 
 /* -------------------------------------------------------------------------- */
