@@ -381,6 +381,165 @@ static GwResult_t gwSimTestCommandService(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* ACK processing                                                             */
+/* -------------------------------------------------------------------------- */
+
+static GwResult_t gwSimTestAck(void)
+{
+    GwLoRaAck_t ack = {0};
+
+    /* ---------------------------------------------------------------------- */
+    /* Build valid ACK                                                        */
+    /* ---------------------------------------------------------------------- */
+
+    ack.node = GW_SIM_TEST_NODE_ID;
+    ack.type = GW_PKT_ACK;
+    ack.seq = 1u;
+    ack.result = GW_ACK_OK;
+    ack.gwid = GW_SIM_TEST_GATEWAY_ID;
+
+    ack.crc8 = gwPacketCrc8(
+        (const uint8_t *)&ack,
+        sizeof(ack) - 1u);
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate ACK length                                                    */
+    /* ---------------------------------------------------------------------- */
+
+    if (sizeof(ack) != 6u)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK packet length");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK packet length");
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate ACK CRC                                                       */
+    /* ---------------------------------------------------------------------- */
+
+    if (!gwPacketCrcValid(
+            (const uint8_t *)&ack,
+            sizeof(ack)))
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK valid CRC");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK valid CRC");
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate ACK fields                                                    */
+    /* ---------------------------------------------------------------------- */
+
+    if (ack.node != GW_SIM_TEST_NODE_ID ||
+        ack.type != GW_PKT_ACK ||
+        ack.seq != 1u ||
+        ack.result != GW_ACK_OK ||
+        ack.gwid != GW_SIM_TEST_GATEWAY_ID)
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK fields");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK fields");
+
+    /* ---------------------------------------------------------------------- */
+    /* Test ACK_DENIED                                                        */
+    /* ---------------------------------------------------------------------- */
+
+    ack.result = GW_ACK_DENIED;
+
+    ack.crc8 = gwPacketCrc8(
+        (const uint8_t *)&ack,
+        sizeof(ack) - 1u);
+
+    if (!gwPacketCrcValid(
+            (const uint8_t *)&ack,
+            sizeof(ack)))
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK_DENIED CRC");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK_DENIED");
+
+    /* ---------------------------------------------------------------------- */
+    /* Test ACK_FAULT                                                         */
+    /* ---------------------------------------------------------------------- */
+
+    ack.result = GW_ACK_FAULT;
+
+    ack.crc8 = gwPacketCrc8(
+        (const uint8_t *)&ack,
+        sizeof(ack) - 1u);
+
+    if (!gwPacketCrcValid(
+            (const uint8_t *)&ack,
+            sizeof(ack)))
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK_FAULT CRC");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK_FAULT");
+
+    /* ---------------------------------------------------------------------- */
+    /* Test bad CRC rejection                                                 */
+    /* ---------------------------------------------------------------------- */
+
+    ack.result = GW_ACK_OK;
+
+    ack.crc8 = gwPacketCrc8(
+        (const uint8_t *)&ack,
+        sizeof(ack) - 1u);
+
+    ack.crc8 ^= 0x01u;
+
+    if (gwPacketCrcValid(
+            (const uint8_t *)&ack,
+            sizeof(ack)))
+    {
+        ESP_LOGE(
+            TAG,
+            "[FAIL] ACK bad CRC was accepted");
+
+        return GW_RESULT_ERROR;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "[PASS] ACK bad CRC rejected");
+
+    return GW_RESULT_OK;
+}
+
+/* -------------------------------------------------------------------------- */
 /* STATUS and EVENT processing                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -680,6 +839,17 @@ GwResult_t gwSimTestRun(void)
     /* ---------------------------------------------------------------------- */
 
     result = gwSimTestCommandService();
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* ACK                                                                      */
+    /* ---------------------------------------------------------------------- */
+
+    result = gwSimTestAck();
 
     if (result != GW_RESULT_OK)
     {
