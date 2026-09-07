@@ -52,6 +52,11 @@ GwResult_t gwCommunicationDeinit(void)
     return GW_RESULT_OK;
 }
 
+bool gwCommunicationIsInitialized(void)
+{
+    return s_initialized;
+}
+
 GwResult_t gwCommunicationSend(
     const uint8_t *packet,
     size_t length)
@@ -134,9 +139,4 @@ GwResult_t gwCommunicationGetTransport(
     }
 
     return gwTransportGetConfig(config);
-}
-
-bool gwCommunicationIsInitialized(void)
-{
-    return s_initialized;
 }
