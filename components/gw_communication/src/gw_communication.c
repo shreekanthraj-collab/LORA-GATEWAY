@@ -109,6 +109,78 @@ GwResult_t gwCommunicationReceive(
         received_length);
 }
 
+GwResult_t gwCommunicationSendFrame(
+    const GwProtocolFrame_t *frame)
+{
+    uint8_t buffer[GW_PROTOCOL_MAX_FRAME];
+    size_t encoded_length = 0u;
+    GwResult_t result;
+
+    if (!s_initialized)
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (frame == NULL)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    result = gwProtocolEncode(
+        frame,
+        buffer,
+        sizeof(buffer),
+        &encoded_length);
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    return gwTransportSend(
+        buffer,
+        encoded_length);
+}
+
+GwResult_t gwCommunicationReceiveFrame(
+    GwProtocolFrame_t *frame,
+    uint8_t *payload_buffer,
+    size_t payload_buffer_size)
+{
+    uint8_t buffer[GW_PROTOCOL_MAX_FRAME];
+    size_t received_length = 0u;
+    GwResult_t result;
+
+    if (!s_initialized)
+    {
+        return GW_RESULT_NOT_INITIALIZED;
+    }
+
+    if (frame == NULL ||
+        payload_buffer == NULL ||
+        payload_buffer_size == 0u)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
+    result = gwTransportReceive(
+        buffer,
+        sizeof(buffer),
+        &received_length);
+
+    if (result != GW_RESULT_OK)
+    {
+        return result;
+    }
+
+    return gwProtocolDecode(
+        buffer,
+        received_length,
+        frame,
+        payload_buffer,
+        payload_buffer_size);
+}
+
 GwResult_t gwCommunicationSetTransport(
     const GwTransportConfig_t *config)
 {

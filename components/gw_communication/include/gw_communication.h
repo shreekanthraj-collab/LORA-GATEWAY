@@ -41,6 +41,18 @@ GwResult_t gwCommunicationReceive(
     size_t *received_length);
 
 /* -------------------------------------------------------------------------- */
+/* Protocol codec                                                              */
+/* -------------------------------------------------------------------------- */
+
+GwResult_t gwCommunicationSendFrame(
+    const GwProtocolFrame_t *frame);
+
+GwResult_t gwCommunicationReceiveFrame(
+    GwProtocolFrame_t *frame,
+    uint8_t *payload_buffer,
+    size_t payload_buffer_size);
+
+/* -------------------------------------------------------------------------- */
 /* Transport configuration                                                     */
 /* -------------------------------------------------------------------------- */
 
