@@ -2,11 +2,14 @@
 
 #include "esp_log.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "gw_lifecycle.h"
 #include "gw_platform.h"
+#include "gw_radio.h"
 #include "gw_communication.h"
 #include "gw_runtime.h"
-#include "gw_sim_test.h"
 #include "gw_transport.h"
 
 static const char *TAG = "GW_MAIN";
@@ -17,7 +20,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "ORB DRIVE LORA GATEWAY");
-    ESP_LOGI(TAG, "ESP32-S3 / SIM TEST MODE");
+    ESP_LOGI(TAG, "ESP32-S3 / DUAL SX1262 RADIO MODE");
     ESP_LOGI(TAG, "========================================");
 
     /* --------------------------------------------------------- */
@@ -28,17 +31,11 @@ void app_main(void)
 
     if (result != GW_RESULT_OK)
     {
-        ESP_LOGE(
-            TAG,
-            "Platform init failed: %d",
-            result);
-
+        ESP_LOGE(TAG, "Platform init failed: %d", result);
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "Platform init: OK");
+    ESP_LOGI(TAG, "Platform init: OK");
 
     /* --------------------------------------------------------- */
     /* Gateway lifecycle initialization                          */
@@ -48,45 +45,66 @@ void app_main(void)
 
     if (result != GW_RESULT_OK)
     {
-        ESP_LOGE(
-            TAG,
-            "Lifecycle init failed: %d",
-            result);
-
+        ESP_LOGE(TAG, "Lifecycle init failed: %d", result);
+        (void)gwPlatformDeinit();
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "Lifecycle init: OK");
+    ESP_LOGI(TAG, "Lifecycle init: OK");
 
     result = gwLifecycleSetStage(
         GW_LIFECYCLE_DRIVERS_INIT);
 
     if (result != GW_RESULT_OK)
     {
-        ESP_LOGE(
-            TAG,
-            "Drivers stage failed: %d",
-            result);
-
+        ESP_LOGE(TAG, "Drivers stage failed: %d", result);
+        (void)gwPlatformDeinit();
         return;
     }
 
     /* --------------------------------------------------------- */
-    /* SIM transport                                             */
-    /*                                                           */
-    /* No SX1262 hardware is required.                           */
+    /* Dual SX1262 radio initialization                          */
     /* --------------------------------------------------------- */
 
-    GwTransportConfig_t transport_config = {
-        .type = GW_TRANSPORT_SIM,
+    const GwRadioConfig_t radio_config = {
+        .frequency_hz = 915000000U,
+        .bandwidth = 125U,
+        .spreading_factor = 7U,
+        .coding_rate = 1U,
+        .tx_power_dbm = 14
+    };
+
+    ESP_LOGI(TAG, "Initializing dual SX1262 radios...");
+
+    result = gwRadioInit(&radio_config);
+
+    if (result != GW_RESULT_OK)
+    {
+        ESP_LOGE(TAG, "Radio init FAILED: %d", result);
+        (void)gwPlatformDeinit();
+        return;
+    }
+
+    if (!gwRadioAllInitialized())
+    {
+        ESP_LOGE(TAG, "Not all SX1262 radios initialized");
+        (void)gwRadioDeinit();
+        (void)gwPlatformDeinit();
+        return;
+    }
+
+    ESP_LOGI(TAG, "Dual SX1262 radios: initialized");
+
+    /* --------------------------------------------------------- */
+    /* Radio transport                                           */
+    /* --------------------------------------------------------- */
+
+    const GwTransportConfig_t transport_config = {
+        .type = GW_TRANSPORT_RADIO,
         .radio = GW_TRANSPORT_RADIO_AUTO
     };
 
-    ESP_LOGI(
-        TAG,
-        "Initializing SIM transport...");
+    ESP_LOGI(TAG, "Initializing RADIO transport...");
 
     result = gwCommunicationInit(
         &transport_config);
@@ -95,23 +113,18 @@ void app_main(void)
     {
         ESP_LOGE(
             TAG,
-            "SIM communication init FAILED: %d",
+            "Radio communication init FAILED: %d",
             result);
 
+        (void)gwRadioDeinit();
+        (void)gwPlatformDeinit();
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "SIM communication: initialized");
+    ESP_LOGI(TAG, "RADIO communication: initialized");
 
     /* --------------------------------------------------------- */
     /* Gateway runtime initialization                            */
-    /*                                                           */
-    /* Runtime owns:                                             */
-    /* - Node Manager                                             */
-    /* - Command Service                                          */
-    /* - Event Service                                            */
     /* --------------------------------------------------------- */
 
     result = gwRuntimeInit();
@@ -124,25 +137,23 @@ void app_main(void)
             result);
 
         (void)gwCommunicationDeinit();
-
+        (void)gwRadioDeinit();
+        (void)gwPlatformDeinit();
         return;
     }
 
     if (!gwRuntimeIsReady())
     {
-        ESP_LOGE(
-            TAG,
-            "Gateway runtime is not ready");
+        ESP_LOGE(TAG, "Gateway runtime is not ready");
 
         (void)gwRuntimeDeinit();
         (void)gwCommunicationDeinit();
-
+        (void)gwRadioDeinit();
+        (void)gwPlatformDeinit();
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "Gateway runtime: initialized");
+    ESP_LOGI(TAG, "Gateway runtime: initialized");
 
     /* --------------------------------------------------------- */
     /* Application ready                                         */
@@ -160,82 +171,23 @@ void app_main(void)
 
         (void)gwRuntimeDeinit();
         (void)gwCommunicationDeinit();
-
+        (void)gwRadioDeinit();
+        (void)gwPlatformDeinit();
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "Gateway application ready");
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "Gateway application ready");
+    ESP_LOGI(TAG, "Dual SX1262 radio startup complete");
+    ESP_LOGI(TAG, "========================================");
 
     /* --------------------------------------------------------- */
-    /* Run SIM test                                              */
+    /* Gateway main loop                                         */
     /* --------------------------------------------------------- */
 
-    ESP_LOGI(
-        TAG,
-        "Starting Gateway SIM test...");
-
-    result = gwSimTestRun();
-
-    if (result != GW_RESULT_OK)
+    while (true)
     {
-        ESP_LOGE(
-            TAG,
-            "========================================");
-
-        ESP_LOGE(
-            TAG,
-            "Gateway SIM Test: FAIL (%d)",
-            result);
-
-        ESP_LOGE(
-            TAG,
-            "========================================");
-
-        (void)gwRuntimeDeinit();
-        (void)gwCommunicationDeinit();
-
-        return;
+        vTaskDelay(
+            pdMS_TO_TICKS(1000U));
     }
-
-    ESP_LOGI(
-        TAG,
-        "========================================");
-
-    ESP_LOGI(
-        TAG,
-        "Gateway SIM Test: PASS");
-
-    ESP_LOGI(
-        TAG,
-        "========================================");
-
-    /* --------------------------------------------------------- */
-    /* Cleanup                                                    */
-    /* --------------------------------------------------------- */
-
-    result = gwRuntimeDeinit();
-
-    if (result != GW_RESULT_OK)
-    {
-        ESP_LOGE(
-            TAG,
-            "Runtime deinit failed: %d",
-            result);
-    }
-
-    result = gwCommunicationDeinit();
-
-    if (result != GW_RESULT_OK)
-    {
-        ESP_LOGE(
-            TAG,
-            "Communication deinit failed: %d",
-            result);
-    }
-
-    ESP_LOGI(
-        TAG,
-        "Gateway SIM test complete");
 }
