@@ -1,0 +1,180 @@
+﻿{
+  "project": "LORA-GATEWAY",
+  "target": "ESP32-S3 dual SX1262 LoRa Gateway",
+  "framework": "ESP-IDF v5.3.1",
+  "repository": "LORA-GATEWAY",
+  "branch": "feat/gateway-layer0-architecture",
+
+  "git": {
+    "head": "176f0e7",
+    "latest_commit": "Use per-radio frozen LoRa frequencies",
+    "previous_commits": [
+      "f7a4c1c Switch gateway main to dual SX1262 radio startup",
+      "88a18e9 Add runtime RX ACK audit"
+    ],
+    "working_tree": "clean",
+    "remote_sync": "up to date"
+  },
+
+  "build": {
+    "idf_reconfigure": "SUCCESS",
+    "idf_build": "BLOCKED_BY_WINDOWS_NINJA_ACCESS_DENIED",
+    "error": "ninja: fatal: CreateProcess: Access is denied.",
+    "decision": "IGNORE_FOR_NOW"
+  },
+
+  "workflow": {
+    "source_edit_method": "PowerShell here-string",
+    "required_command": "@' ... full file contents ... '@ | Set-Content -Encoding UTF8 .\\path\\file",
+    "one_step_at_a_time": true,
+    "one_pasteable_block_per_step": true,
+    "wait_for_terminal_output": true,
+    "no_notepad": true,
+    "no_manual_code_merging": true,
+    "do_not_make_user_find_line_numbers": true
+  },
+
+  "radio": {
+    "hardware": "dual SX1262",
+    "count": 2,
+    "shared_spi": {
+      "mosi": 35,
+      "miso": 37,
+      "sck": 36,
+      "host": 2
+    },
+    "radio_0": {
+      "cs": 14,
+      "dio1": 5,
+      "rxen": 17,
+      "txen": 18,
+      "reset": 39,
+      "busy": 21,
+      "frequency_hz": 865000000
+    },
+    "radio_1": {
+      "cs": 13,
+      "dio1": 10,
+      "rxen": 6,
+      "txen": 7,
+      "reset": 11,
+      "busy": 12,
+      "frequency_hz": 865500000
+    },
+    "bandwidth_khz": 125,
+    "spreading_factor": 7,
+    "coding_rate": 1,
+    "tx_power_dbm": 14
+  },
+
+  "radio_api": {
+    "header": "components/gw_platform/include/gw_radio.h",
+    "config_frequency_field": "uint32_t frequency_hz",
+    "important_note": "GwRadioConfig_t uses a SINGLE frequency_hz field.",
+    "public_apis": [
+      "gwRadioInit",
+      "gwRadioDeinit",
+      "gwRadioIsInitialized",
+      "gwRadioAllInitialized",
+      "gwRadioGetConfig",
+      "gwRadioSend",
+      "gwRadioReceive",
+      "gwRadioReset",
+      "gwRadioGetBusy",
+      "gwRadioGetDio1",
+      "gwRadioSetRxTx"
+    ],
+    "frequency_implementation": "gw_radio.c selects frozen hardware frequency by radio ID"
+  },
+
+  "transport": {
+    "header": "components/gw_communication/include/gw_transport.h",
+    "types": [
+      "GW_TRANSPORT_SIM",
+      "GW_TRANSPORT_RADIO"
+    ],
+    "radio_selection": [
+      "GW_TRANSPORT_RADIO_0",
+      "GW_TRANSPORT_RADIO_1",
+      "GW_TRANSPORT_RADIO_AUTO"
+    ],
+    "current_auto_policy": "AUTO resolves to RADIO_0",
+    "future_policy": "Dual-radio scheduling/arbitration layer"
+  },
+
+  "runtime": {
+    "source": "components/gw_runtime/src/gw_runtime.c",
+    "initializes": [
+      "gwNodeManager",
+      "gwCommandService",
+      "gwEventService"
+    ],
+    "rx_classification": [
+      "GW_PKT_ACK",
+      "GW_PKT_STATUS",
+      "GW_PKT_EVENT",
+      "GW_PKT_SCHED"
+    ],
+    "ready_condition": "Runtime + Node Manager + Command Service + Event Service initialized"
+  },
+
+  "main": {
+    "source": "main/main.c",
+    "mode": "RADIO",
+    "transport_type": "GW_TRANSPORT_RADIO",
+    "radio_selection": "GW_TRANSPORT_RADIO_AUTO",
+    "startup_sequence": [
+      "gwPlatformInit",
+      "gwLifecycleInit",
+      "GW_LIFECYCLE_DRIVERS_INIT",
+      "gwRadioInit",
+      "gwCommunicationInit",
+      "gwRuntimeInit",
+      "GW_LIFECYCLE_APPLICATION_READY"
+    ],
+    "loop": "FreeRTOS vTaskDelay"
+  },
+
+  "platform": {
+    "header": "components/gw_platform/include/gw_platform.h",
+    "implementation": "components/gw_platform/src/gw_platform.c",
+    "eol_manufacturing": "Excluded from production platform lifecycle"
+  },
+
+  "completed_work": [
+    "Gateway main switched from simulation startup to dual SX1262 radio startup",
+    "FreeRTOS task support added to main",
+    "Simulation test include removed from main",
+    "Dual SX1262 radio initialization integrated",
+    "Per-radio frozen LoRa frequencies implemented",
+    "Radio 0 frequency fixed at 865000000 Hz",
+    "Radio 1 frequency fixed at 865500000 Hz",
+    "Confirmed GwRadioConfig_t retains single frequency_hz field",
+    "Changes committed and pushed"
+  ],
+
+  "recovery_history": {
+    "restored_from": "origin/feat/gateway-layer0-architecture",
+    "restoration_method": [
+      "git reset --hard origin/feat/gateway-layer0-architecture",
+      "git clean -fd"
+    ],
+    "known_recovered_errors": [
+      "duplicate radio_config in main.c",
+      "incorrect frequency_hz array version",
+      "missing FreeRTOS includes",
+      "incorrect braces around main loop",
+      "nested/duplicate gwRadioSetPacketParams"
+    ]
+  },
+
+  "next_phase": {
+    "status": "READY_TO_CONTINUE",
+    "priority": "Complete gateway Layer-0 handoff before adding higher-level functionality",
+    "do_not_recheck_unless_needed": [
+      "gw_runtime.h",
+      "already confirmed radio header state",
+      "already confirmed clean git state"
+    ]
+  }
+}
