@@ -1,0 +1,172 @@
+﻿{
+  "protocol": {
+    "name": "ORB DRIVE GATEWAY-NODE PROTOCOL",
+    "version": "1.0",
+    "transport": "LoRa SX1262",
+    "application_format": "JSON",
+    "wire_format": "binary",
+    "direction": "gateway <-> node"
+  },
+
+  "addressing": {
+    "gateway_id": "string",
+    "node_id": "uint32"
+  },
+
+  "message": {
+    "version": 1,
+    "message_id": "uint32",
+    "timestamp": "uint32",
+    "gateway_id": "string",
+    "node_id": "uint32",
+    "type": "command|ack|status|event|schedule",
+    "command": "string|null",
+    "result": "ok|error|busy|timeout|invalid|null",
+    "payload": "object"
+  },
+
+  "commands": {
+    "OPEN": {
+      "opcode": "0x01",
+      "payload": {}
+    },
+    "CLOSE": {
+      "opcode": "0x02",
+      "payload": {}
+    },
+    "STOP": {
+      "opcode": "0x03",
+      "payload": {}
+    },
+    "GET_STATUS": {
+      "opcode": "0x04",
+      "payload": {}
+    },
+    "SET_POSITION": {
+      "opcode": "0x05",
+      "payload": {
+        "position_percent": "uint8"
+      }
+    },
+    "SET_SCHEDULE": {
+      "opcode": "0x06",
+      "payload": {
+        "enabled": "bool",
+        "open_time": "string",
+        "close_time": "string"
+      }
+    },
+    "CLEAR_SCHEDULE": {
+      "opcode": "0x07",
+      "payload": {}
+    },
+    "CALIBRATE": {
+      "opcode": "0x0F",
+      "payload": {}
+    },
+    "CAL_SET": {
+      "opcode": "0x10",
+      "payload": {}
+    },
+    "CAL_ABORT": {
+      "opcode": "0x11",
+      "payload": {}
+    },
+    "ENTER_EOL": {
+      "opcode": "0x12",
+      "payload": {}
+    },
+    "REBIND_OWNER": {
+      "opcode": "0x13",
+      "payload": {
+        "gateway_id": "string"
+      }
+    },
+    "SET_CURRENT": {
+      "opcode": "0x0E",
+      "payload": {
+        "current_a": "float"
+      }
+    },
+    "SET_DISENGAGE_CURRENT": {
+      "opcode": "0x15",
+      "payload": {
+        "current_a": "float"
+      }
+    }
+  },
+
+  "ack": {
+    "packet_type": "0xAA",
+    "required_fields": [
+      "message_id",
+      "node_id",
+      "result"
+    ],
+    "payload": {
+      "opcode": "uint8",
+      "error_code": "uint16|null"
+    }
+  },
+
+  "status": {
+    "packet_type": "0x20",
+    "payload": {
+      "position_percent": "uint8",
+      "total_turns": "float",
+      "current_a": "float",
+      "battery_v": "float|null",
+      "rssi_dbm": "int16",
+      "valve_state": "open|closed|moving|stopped|fault",
+      "motor_state": "on|off",
+      "calibrated": "bool",
+      "firmware": "string"
+    }
+  },
+
+  "event": {
+    "packet_type": "0x30",
+    "payload": {
+      "event": "string",
+      "position_percent": "uint8|null",
+      "current_a": "float|null",
+      "battery_v": "float|null",
+      "error_code": "uint16|null"
+    }
+  },
+
+  "schedule": {
+    "packet_type": "0x40",
+    "payload": {
+      "enabled": "bool",
+      "open_time": "string",
+      "close_time": "string",
+      "next_action": "open|close|none"
+    }
+  },
+
+  "known_packet_types": {
+    "COMMAND": "0x10",
+    "ACK": "0xAA",
+    "STATUS": "0x20",
+    "EVENT": "0x30",
+    "SCHEDULE_STATUS": "0x40",
+    "EOL_START": "0x60",
+    "EOL_RESULT": "0x61",
+    "EOL_SUMMARY": "0x62"
+  },
+
+  "rules": {
+    "json_is_application_layer": true,
+    "json_is_not_sent_directly_over_lora": true,
+    "gateway_encodes_json_command_to_binary": true,
+    "gateway_decodes_binary_node_response_to_json": true,
+    "node_decodes_binary_command": true,
+    "node_encodes_binary_response": true,
+    "message_id_correlates_command_and_ack": true,
+    "node_id_required_for_node_messages": true,
+    "gateway_id_required_for_ownership_messages": true,
+    "status_is_state_based": true,
+    "events_are_event_driven": true
+  }
+}

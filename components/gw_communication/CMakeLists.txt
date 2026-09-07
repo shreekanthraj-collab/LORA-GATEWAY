@@ -1,8 +1,8 @@
-idf_component_register(
+﻿idf_component_register(
     SRCS
         "src/gw_communication.c"
         "src/gw_transport.c"
-
+        "src/gw_protocol_codec.c"
 
     INCLUDE_DIRS
         "include"
