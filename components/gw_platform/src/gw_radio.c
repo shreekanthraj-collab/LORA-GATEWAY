@@ -748,9 +748,14 @@ static esp_err_t gwRadioConfigureDevice(
         return err;
     }
 
+    const uint32_t radio_frequency_hz =
+        (radio == GW_RADIO_0)
+            ? GW_RADIO0_FREQUENCY_HZ
+            : GW_RADIO1_FREQUENCY_HZ;
+
     err = gwRadioSetRfFrequency(
         radio,
-        config->frequency_hz);
+        radio_frequency_hz);
 
     if (err != ESP_OK)
     {
