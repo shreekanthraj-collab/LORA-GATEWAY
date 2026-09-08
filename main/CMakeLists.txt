@@ -10,4 +10,5 @@
         gw_platform
         gw_communication
         gw_runtime
+        gw_eol
 )
