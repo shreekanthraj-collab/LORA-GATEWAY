@@ -72,14 +72,11 @@ bool gwProtocolIsPacketTypeValid(
 {
     switch (packet_type)
     {
-        case GW_PKT_COMMAND:
+        case GW_PKT_CMD:
         case GW_PKT_ACK:
         case GW_PKT_STATUS:
         case GW_PKT_EVENT:
         case GW_PKT_SCHED:
-        case GW_PKT_EOL_START:
-        case GW_PKT_EOL_RESULT:
-        case GW_PKT_EOL_SUMMARY:
             return true;
 
         default:
@@ -96,9 +93,9 @@ bool gwProtocolIsCommandValid(
         case GW_CMD_CLOSE:
         case GW_CMD_STOP:
         case GW_CMD_GET_STATUS:
-        case GW_CMD_SET_POSITION:
+        case GW_CMD_SET_TURNS:
         case GW_CMD_SET_SCHEDULE:
-        case GW_CMD_CLEAR_SCHEDULE:
+        case GW_CMD_CLR_SCHEDULE:
         case GW_CMD_SET_CURRENT:
         case GW_CMD_CALIBRATE:
         case GW_CMD_CAL_SET:
@@ -201,10 +198,13 @@ GwResult_t gwProtocolEncode(
 GwResult_t gwProtocolDecode(
     const uint8_t *buffer,
     size_t length,
-    GwProtocolFrame_t *frame)
+    GwProtocolFrame_t *frame,
+    uint8_t *payload_buffer,
+    size_t payload_buffer_size)
 {
     if (buffer == NULL ||
-        frame == NULL)
+        frame == NULL ||
+        payload_buffer == NULL)
     {
         return GW_RESULT_INVALID_ARG;
     }
@@ -235,6 +235,11 @@ GwResult_t gwProtocolDecode(
         return GW_RESULT_INVALID_ARG;
     }
 
+    if (payload_length > payload_buffer_size)
+    {
+        return GW_RESULT_INVALID_ARG;
+    }
+
     const uint16_t received_crc =
         gwGetU16(
             &buffer[length - GW_PROTOCOL_CRC_SIZE]);
@@ -261,9 +266,15 @@ GwResult_t gwProtocolDecode(
     frame->node_id =
         gwGetU32(&buffer[10]);
 
-    frame->payload =
-        &buffer[GW_PROTOCOL_HEADER_SIZE];
+    if (payload_length > 0U)
+    {
+        memcpy(
+            payload_buffer,
+            &buffer[GW_PROTOCOL_HEADER_SIZE],
+            payload_length);
+    }
 
+    frame->payload = payload_buffer;
     frame->payload_length =
         (uint16_t)payload_length;
 

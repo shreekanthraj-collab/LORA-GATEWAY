@@ -3,6 +3,7 @@
         "src/gw_communication.c"
         "src/gw_transport.c"
         "src/gw_protocol_codec.c"
+        "src/gw_node_command.c"
 
     INCLUDE_DIRS
         "include"
